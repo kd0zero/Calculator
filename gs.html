@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>全能数学工作台 (专业渲染版)</title>
+    
+    <script defer src="//unpkg.com/mathlive"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.js"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/nerdamer@1.1.13/nerdamer.core.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/nerdamer@1.1.13/Algebra.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/nerdamer@1.1.13/Calculus.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/nerdamer@1.1.13/Solve.js"></script>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+    <style>
+        :root {
+            --primary: #2b579a;
+            --secondary: #d83b01;
+            --bg: #f3f2f1;
+            --border: #e1dfdd;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background-color: var(--bg);
+            display: flex;
+            justify-content: center;
+            padding-top: 30px;
+            margin: 0;
+            padding-bottom: 50px;
+        }
+
+        .app-container {
+            width: 900px;
+            background: white;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            border-radius: 6px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 顶部工具栏 */
+        .toolbar {
+            background: #f8f9fa;
+            padding: 10px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+
+        .tool-btn {
+            background: white;
+            border: 1px solid #ddd;
+            padding: 6px 12px;
+            cursor: pointer;
+            border-radius: 3px;
+            min-width: 36px;
+            transition: all 0.2s;
+            color: #444;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .tool-btn:hover {
+            background: #eef4fb;
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+        
+        .divider { width: 1px; background: #ccc; margin: 0 6px; }
+
+        /* 编辑区域 */
+        .editor-area {
+            padding: 40px;
+            min-height: 120px;
+            background: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* 输入框样式 */
+        #mf {
+            font-size: 32px;
+            padding: 20px;
+            width: 100%;
+            text-align: center;
+            background: #fff;
+            border-radius: 4px;
+        }
+        #mf:focus-within { outline: none; background: #fafafa; }
+
+        /* 底部操作面板 */
+        .action-panel {
+            background: #fafafa;
+            border-top: 1px solid var(--border);
+            padding: 20px;
+        }
+
+        .main-actions {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .btn:active { transform: translateY(1px); }
+
+        .btn-copy { background: #107c10; color: white; }
+        .btn-vars { background: var(--primary); color: white; } 
+        .btn-symb { background: var(--secondary); color: white; } 
+
+        .sub-panel {
+            display: none;
+            background: white;
+            border: 1px solid #eee;
+            border-radius: 6px;
+            padding: 20px;
+            margin-top: 10px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        /* 变量代入样式 */
+        .var-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .var-item {
+            display: flex;
+            align-items: center;
+            border: 1px solid #ddd;
+            padding: 5px 10px;
+            border-radius: 4px;
+        }
+        .var-label { font-weight: bold; margin-right: 8px; color: var(--primary); font-family: 'Times New Roman'; font-style: italic;}
+        .var-input { border: none; outline: none; width: 100%; font-size: 16px; }
+
+        /* --- 智能计算步骤样式 (重点修改部分) --- */
+        .step-row {
+            display: flex;
+            margin-bottom: 15px;
+            border-bottom: 1px dashed #eee;
+            padding-bottom: 15px;
+            align-items: center; /* 垂直居中 */
+        }
+        .step-num {
+            background: var(--secondary);
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            text-align: center;
+            font-size: 13px;
+            line-height: 24px;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+        .step-content { 
+            flex: 1; 
+            font-size: 16px; 
+            line-height: 1.8; 
+            color: #333; 
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        /* 使用 math-field[read-only] 来渲染结果，而不是显示纯文本 */
+        math-field.read-only-math {
+            border: none;
+            background: transparent;
+            color: #000;
+            padding: 0 4px;
+            margin: 0 2px;
+            font-size: 1.1em;
+            display: inline-block;
+            vertical-align: middle;
+            pointer-events: none; /* 禁止交互，纯展示 */
+            min-width: auto;
+            width: auto;
+        }
+        
+        /* 隐藏 read-only 组件的聚焦边框 */
+        math-field.read-only-math:focus { outline: none; box-shadow: none; }
+        
+        /* 结果显示 */
+        .result-box {
+            margin-top: 15px;
+            padding: 20px;
+            background: #e6f2ff;
+            border-left: 4px solid var(--primary);
+            font-size: 20px;
+            font-weight: bold;
+            color: #004578;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .result-box.symbolic {
+            background: #fff4e6;
+            border-left-color: var(--secondary);
+            color: #a42e01;
+        }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div class="toolbar">
+        <button class="tool-btn" onclick="insertCmd('\\frac{#0}{#1}')" title="分数"><i class="fas fa-divide"></i></button>
+        <button class="tool-btn" onclick="insertCmd('\\sqrt{#0}')">√</button>
+        <button class="tool-btn" onclick="insertCmd('#0^{#1}')">x²</button>
+        <button class="tool-btn" onclick="insertCmd('(')">( )</button>
+        <div class="divider"></div>
+        <button class="tool-btn" onclick="insertCmd('\\int_{0}^{1}')" title="定积分">∫</button>
+        <button class="tool-btn" onclick="insertCmd('\\lim_{x \\to 0}')" title="极限">lim</button>
+        <div class="divider"></div>
+        <button class="tool-btn" onclick="insertCmd('\\sin(#0)')">sin</button>
+        <button class="tool-btn" onclick="insertCmd('\\cos(#0)')">cos</button>
+        <button class="tool-btn" onclick="insertCmd('\\ln(#0)')">ln</button>
+        <button class="tool-btn" onclick="insertCmd('\\pi')">π</button>
+        <button class="tool-btn" onclick="insertCmd('x')">x</button>
+    </div>
+
+    <div class="editor-area">
+        <math-field id="mf" virtual-keyboard-mode="onfocus">\int_0^1 \sin x dx</math-field>
+    </div>
+
+    <div class="action-panel">
+        <div class="main-actions">
+            <button class="btn btn-copy" onclick="copyToWord()">
+                <i class="fas fa-copy"></i> 复制到 Word
+            </button>
+            <button class="btn btn-vars" onclick="activateVarMode()">
+                <i class="fas fa-calculator"></i> 代入求值
+            </button>
+            <button class="btn btn-symb" onclick="activateSymbolicMode()">
+                <i class="fas fa-brain"></i> 智能计算(微积分)
+            </button>
+        </div>
+
+        <div id="panel-vars" class="sub-panel">
+            <h4 style="margin-top:0; color:#2b579a;">数值代入模式</h4>
+            <div id="var-container" class="var-grid"></div>
+            <button class="btn btn-vars" style="width:100%; justify-content:center;" onclick="doVarCalculation()">开始计算</button>
+            <div id="var-result" class="result-box" style="display:none"></div>
+        </div>
+
+        <div id="panel-symb" class="sub-panel">
+            <h4 style="margin-top:0; color:#d83b01;">计算流程详解</h4>
+            <div id="step-container"></div>
+            <div id="symb-result" class="result-box symbolic" style="display:none"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const mf = document.getElementById('mf');
+    const panelVars = document.getElementById('panel-vars');
+    const panelSymb = document.getElementById('panel-symb');
+    const varContainer = document.getElementById('var-container');
+    const varResult = document.getElementById('var-result');
+    const stepContainer = document.getElementById('step-container');
+    const symbResult = document.getElementById('symb-result');
+
+    // Nerdamer 设置
+    nerdamer.set('SOLUTIONS_AS_OBJECT', true);
+
+    function insertCmd(latex) {
+        mf.executeCommand('insert', latex);
+        mf.focus();
+    }
+
+    function copyToWord() {
+        const mathML = mf.getValue('mathml');
+        const blobItem = new ClipboardItem({
+            'text/plain': new Blob([mathML], { type: 'text/plain' }),
+            'text/html': new Blob([mathML], { type: 'text/html' })
+        });
+        navigator.clipboard.write([blobItem]).then(() => alert('已复制！'));
+    }
+
+    function activateVarMode() {
+        panelSymb.style.display = 'none';
+        panelVars.style.display = 'block';
+        analyzeVariables(); 
+    }
+
+    function activateSymbolicMode() {
+        panelVars.style.display = 'none';
+        panelSymb.style.display = 'block';
+        doSymbolicCalculation(); 
+    }
+
+    // --- 代入计算模块 (Math.js) ---
+    function analyzeVariables() {
+        const latex = mf.getValue('latex');
+        const variables = new Set();
+        const ignoreList = ['sin','cos','tan','ln','log','sqrt','pi','e'];
+        let cleanStr = latex.replace(/\\[a-zA-Z]+/g, '');
+        const matches = cleanStr.match(/[a-zA-Z]/g);
+        if (matches) matches.forEach(c => { if(!ignoreList.includes(c.toLowerCase())) variables.add(c); });
+
+        varContainer.innerHTML = '';
+        varResult.style.display = 'none';
+        if (variables.size === 0) varContainer.innerHTML = '<div style="color:#888;">无变量，可直接计算。</div>';
+
+        variables.forEach(v => {
+            const div = document.createElement('div');
+            div.className = 'var-item';
+            div.innerHTML = `<span class="var-label">${v}</span><input type="number" class="var-input" data-name="${v}" placeholder="0">`;
+            varContainer.appendChild(div);
+        });
+    }
+
+    function doVarCalculation() {
+        const scope = {};
+        document.querySelectorAll('.var-input').forEach(inp => scope[inp.dataset.name] = parseFloat(inp.value) || 0);
+        let formula = mf.getValue('latex')
+            .replace(/\\frac{([^}]+)}{([^}]+)}/g, '($1)/($2)')
+            .replace(/\\sqrt{([^}]+)}/g, 'sqrt($1)')
+            .replace(/\\cdot|\\times/g, '*')
+            .replace(/\\left|\\right/g, '')
+            .replace(/{/g, '(').replace(/}/g, ')')
+            .replace(/\\pi/g, 'pi')
+            .replace(/\^/g, '^')
+            .replace(/\\ln/g, 'log')
+            .replace(/\\(sin|cos|tan)/g, '$1');
+        
+        try {
+            const res = math.format(math.evaluate(formula, scope), {precision:10});
+            varResult.innerHTML = `结果 = ${res}`;
+            varResult.style.display = 'block';
+        } catch(e) {
+            varResult.innerText = "Error: 计算错误";
+            varResult.style.display = 'block';
+        }
+    }
+
+    // --- 智能计算模块 (Nerdamer + MathLive Display) ---
+    function doSymbolicCalculation() {
+        const latex = mf.getValue('latex');
+        stepContainer.innerHTML = '';
+        symbResult.style.display = 'none';
+
+        try {
+            if (latex.includes('\\int')) solveIntegral(latex);
+            else if (latex.includes('\\lim')) solveLimit(latex);
+            else solveAlgebra(latex);
+        } catch (e) {
+            stepContainer.innerHTML = `<div style="color:red">无法解析: ${e.message}</div>`;
+        }
+    }
+
+    // 处理积分
+    function solveIntegral(latex) {
+        let cleanLat = latex.replace(/\\left|\\right|\\,|\\:|\\ /g, '').trim();
+        // 正则兼容 \int_0^1 和 \int_{0}^{1}
+        const match = cleanLat.match(/\\int(?:_\{(.+?)\}|_(.))(?:(?:\^\{(.+?)\})|\^(.))(.*?)d([a-zA-Z])/i);
+
+        if (!match) {
+            stepContainer.innerHTML = '格式识别失败，请检查积分上下限。';
+            return;
+        }
+
+        const lower = match[1] || match[2];
+        const upper = match[3] || match[4];
+        const funcStr = match[5].trim();
+        const variable = match[6];
+
+        // 步骤1
+        addStep(1, `解析任务：
+            对函数 ${toMath(funcStr)} 
+            在区间 ${toMath('[' + lower + ', ' + upper + ']')} 进行积分`);
+
+        const nerdFunc = convertToNerdamer(funcStr);
+        const indefinite = nerdamer(`integrate(${nerdFunc}, ${variable})`);
+        
+        // 步骤2
+        addStep(2, `找到原函数 ${toMath('F(' + variable + ')')}:<br>
+            ${toMath(indefinite.toTeX())}`); // 这里直接把结果变成公式图片
+
+        // 步骤3
+        const valFb = indefinite.sub(variable, convertToNerdamer(upper)).evaluate().text();
+        const valFa = indefinite.sub(variable, convertToNerdamer(lower)).evaluate().text();
+
+        addStep(3, `代入上下限计算 ${toMath('F(b) - F(a)')}:<br>
+            ${toMath('F(' + upper + ') = ' + valFb)} <br>
+            ${toMath('F(' + lower + ') = ' + valFa)}`);
+
+        // 结果
+        const finalResStr = `(${valFb}) - (${valFa})`;
+        const finalRes = nerdamer(finalResStr).evaluate();
+        let displayRes = finalRes.toTeX();
+        
+        // 如果有小数形式
+        try {
+            const dec = nerdamer(finalResStr).evaluate().text('decimals');
+            if (dec !== finalRes.text()) displayRes += ` \\approx ${dec}`;
+        } catch(e){}
+
+        symbResult.innerHTML = `最终结果: ${toMath(displayRes, true)}`; // true 表示结果栏
+        symbResult.style.display = 'flex';
+    }
+
+    // 处理极限
+    function solveLimit(latex) {
+        let cleanLat = latex.replace(/\s+/g, '').replace(/\\left|\\right/g, '');
+        const match = cleanLat.match(/\\lim_\{([a-z])\\to([^}]+)\}(.*)/i);
+        if (!match) return;
+
+        const [_, variable, target, funcStr] = match;
+        
+        addStep(1, `计算极限：当 ${toMath(variable + ' \\to ' + target)} 时，函数 ${toMath(funcStr)} 的值`);
+        
+        const result = nerdamer(`limit(${convertToNerdamer(funcStr)}, ${variable}, ${convertToNerdamer(target)})`);
+        
+        symbResult.innerHTML = `极限值 = ${toMath(result.toTeX(), true)}`;
+        symbResult.style.display = 'flex';
+    }
+
+    // 处理代数
+    function solveAlgebra(latex) {
+        addStep(1, `识别表达式：${toMath(latex)}`);
+        const res = nerdamer(convertToNerdamer(latex)).evaluate();
+        symbResult.innerHTML = `结果 = ${toMath(res.toTeX(), true)}`;
+        symbResult.style.display = 'flex';
+    }
+
+    // --- 核心改动：将 LaTeX 转换为视觉组件 ---
+    function toMath(latex, isResult = false) {
+        // 创建一个 <math-field read-only> 的 HTML 字符串
+        // 这会让浏览器直接渲染出完美的数学公式，而不是显示 \frac...
+        return `<math-field read-only class="read-only-math" style="${isResult ? 'font-size:24px;' : ''}">${latex}</math-field>`;
+    }
+
+    function addStep(num, html) {
+        const row = document.createElement('div');
+        row.className = 'step-row';
+        row.innerHTML = `<div class="step-num">${num}</div><div class="step-content">${html}</div>`;
+        stepContainer.appendChild(row);
+    }
+
+    function convertToNerdamer(str) {
+        return str.replace(/\\pi/g, 'pi')
+             .replace(/\\infty/g, 'Infinity')
+             .replace(/\\cdot|\\times/g, '*')
+             .replace(/\\(sin|cos|tan|ln|log)/g, '$1')
+             .replace(/(sin|cos|tan|ln|log)\s+([a-zA-Z0-9]+)/g, '$1($2)')
+             .replace(/\\sqrt{([^}]+)}/g, 'sqrt($1)')
+             .replace(/\\frac{([^}]+)}{([^}]+)}/g, '($1)/($2)')
+             .replace(/\^{/g, '^(').replace(/}/g, ')');
+    }
+</script>
+
+</body>
+</html>
